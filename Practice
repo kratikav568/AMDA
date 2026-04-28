@@ -1,0 +1,153 @@
+{r}
+install.packages(c("MASS", "ggplot2", "ggrepel", "smacof"))
+library(MASS)
+library(ggplot2)
+library(ggrepel)
+{r}
+# Similarity data (1=very similar, 9=very dissimilar)
+# 8 automobile brands: Toyota, Honda, Ford, BMW, Mercedes, Maruti, Hyundai, Audi
+
+brands <- c("Toyota","Honda","Ford","BMW","Mercedes","Maruti","Hyundai","Audi")
+{r}
+# Dissimilarity matrix (symmetric)
+dissim <- matrix(c(
+  0, 2, 4, 7, 8, 5, 3, 7,
+  2, 0, 4, 7, 8, 5, 3, 7,
+  4, 4, 0, 6, 7, 4, 4, 6,
+  7, 7, 6, 0, 2, 8, 7, 2,
+  8, 8, 7, 2, 0, 9, 8, 3,
+  5, 5, 4, 8, 9, 0, 2, 8,
+  3, 3, 4, 7, 8, 2, 0, 7,
+  7, 7, 6, 2, 3, 8, 7, 0
+), nrow=8, dimnames=list(brands,brands))
+{r}
+# Run classical (metric) MDS
+mds_result <- cmdscale(dissim, k=2, eig=TRUE)
+{r}
+# Goodness of fit
+eigenvalues <- mds_result$eig
+gof <- sum(eigenvalues[1:2]) / sum(abs(eigenvalues))
+cat("Goodness of Fit:", round(gof, 3), "\n")
+{r}
+# Extract coordinates
+coords <- as.data.frame(mds_result$points)
+colnames(coords) <- c("Dim1", "Dim2")
+coords$Brand <- brands
+{r}
+# Plot perceptual map
+ggplot(coords, aes(x=Dim1, y=Dim2, label=Brand)) +
+  geom_point(size=4, color="steelblue") +
+  geom_text_repel(size=4, fontface="bold") +
+  geom_hline(yintercept=0, linetype="dashed", alpha=0.5) +
+  geom_vline(xintercept=0, linetype="dashed", alpha=0.5) +
+  labs(
+    title="Perceptual Map of Automobile Brands",
+    subtitle=paste("Metric MDS | GoF =", round(gof,3)),
+    x="Dimension 1 (Economy ← → Luxury)",
+    y="Dimension 2 (Practical ← → Sporty)"
+  ) +
+  theme_minimal(base_size=13)
+{r}
+# ============================================================
+# Exercise 2: Non-Metric MDS using smacof package
+# ============================================================
+install.packages("smacof")
+library(smacof)
+# Convert to dissimilarity object
+dissim <- matrix(c(
+  0, 2, 4, 7, 8, 5, 3, 7,
+  2, 0, 4, 7, 8, 5, 3, 7,
+  4, 4, 0, 6, 7, 4, 4, 6,
+  7, 7, 6, 0, 2, 8, 7, 2,
+  8, 8, 7, 2, 0, 9, 8, 3,
+  5, 5, 4, 8, 9, 0, 2, 8,
+  3, 3, 4, 7, 8, 2, 0, 7,
+  7, 7, 6, 2, 3, 8, 7, 0
+), nrow=8, dimnames=list(brands,brands))
+
+dissim
+{r}
+diss_obj <- max(dissim) - dissim
+diag(diss_obj) <- 0
+# Run non-metric MDS
+nmds_result <- mds(diss_obj, ndim=2, type="ordinal")
+{r}
+# Stress value
+cat("Stress-1:", round(nmds_result$stress, 4), "\n")
+
+# Shepard diagram
+plot(nmds_result, plot.type="Shepard",
+     main="Shepard Diagram - Non-metric MDS")
+{r}
+# Stress by dimensions (scree plot)
+stress_vals <- numeric(5)
+for(d in 1:5){
+  fit <- mds(diss_obj, ndim=d, type="ordinal")
+  stress_vals[d] <- fit$stress
+}
+plot(1:5, stress_vals, type="b", pch=19, col="tomato",
+     xlab="Number of Dimensions", ylab="Stress",
+     main="Scree Plot: Stress vs. Dimensions")
+abline(h=0.05, lty=2, col="gray50")
+{r}
+# Configuration plot
+plot(nmds_result, main="Non-Metric MDS: Automobile Brands")
+{r}
+# ============================================================
+# Exercise 3: Correspondence Analysis - Brand × Attribute
+# ============================================================
+install.packages("FactoMineR")
+install.packages("factoextra")
+library(FactoMineR)
+library(factoextra)
+# Brand-Attribute contingency table
+brand_attr <- matrix(c(
+  95, 30, 15,  5, 10, 20,   # Brand A
+  20, 80, 40, 10, 25, 30,   # Brand B
+  10, 15, 90,  5, 60, 35,   # Brand C
+  5, 10, 20, 95, 15, 25,   # Brand D
+  15, 20, 30, 10, 80, 70    # Brand E
+), nrow=5, byrow=TRUE)
+{r}
+rownames(brand_attr) <- c("BrandA","BrandB","BrandC","BrandD","BrandE")
+colnames(brand_attr) <- c("Affordable","Reliable","Stylish","EcoFriendly","Premium","Innovative")
+{r}
+# Chi-square test of independence
+chisq_test <- chisq.test(brand_attr)
+cat("Chi-square:", round(chisq_test$statistic, 2),
+    "| df:", chisq_test$parameter,
+    "| p-value:", format(chisq_test$p.value, digits=3), "\n")
+{r}
+# Run Correspondence Analysis
+ca_result <- CA(brand_attr, graph=FALSE)
+
+# Summary of results
+summary(ca_result)
+
+# Eigenvalues and inertia
+cat("\n--- Inertia explained ---\n")
+print(ca_result$eig)
+{r}
+# Run Correspondence Analysis
+ca_result <- CA(brand_attr, graph=FALSE)
+
+# Summary of results
+summary(ca_result)
+
+# Eigenvalues and inertia
+cat("\n--- Inertia explained ---\n")
+print(ca_result$eig)
+{r}
+# Symmetric biplot
+
+fviz_ca_biplot(
+  ca_result,
+  repel = TRUE,
+  title = "CA Biplot: Brand × Attribute Associations"
+)
+
+# Column (attribute) contributions to each dimension
+fviz_contrib(ca_result, choice="col", axes=1,
+             title="Column Contributions to Dimension 1")
+fviz_contrib(ca_result, choice="col", axes=2,
+             title="Column Contributions to Dimension 2")
