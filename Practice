@@ -1,352 +1,664 @@
-{r}
-install.packages(c("MASS", "ggplot2", "ggrepel", "smacof","FactoMineR","factoextra","lavaan","REdaS","readxl","cluster"))
-library(MASS)
-library(ggplot2)
-library(ggrepel)
-{r}
-# Similarity data (1=very similar, 9=very dissimilar)
-# 8 automobile brands: Toyota, Honda, Ford, BMW, Mercedes, Maruti, Hyundai, Audi
-
-brands <- c("Toyota","Honda","Ford","BMW","Mercedes","Maruti","Hyundai","Audi")
-{r}
-# Dissimilarity matrix (symmetric)
-dissim <- matrix(c(
-  0, 2, 4, 7, 8, 5, 3, 7,
-  2, 0, 4, 7, 8, 5, 3, 7,
-  4, 4, 0, 6, 7, 4, 4, 6,
-  7, 7, 6, 0, 2, 8, 7, 2,
-  8, 8, 7, 2, 0, 9, 8, 3,
-  5, 5, 4, 8, 9, 0, 2, 8,
-  3, 3, 4, 7, 8, 2, 0, 7,
-  7, 7, 6, 2, 3, 8, 7, 0
-), nrow=8, dimnames=list(brands,brands))
-{r}
-# Run classical (metric) MDS
-mds_result <- cmdscale(dissim, k=2, eig=TRUE)
-{r}
-# Goodness of fit
-eigenvalues <- mds_result$eig
-gof <- sum(eigenvalues[1:2]) / sum(abs(eigenvalues))
-cat("Goodness of Fit:", round(gof, 3), "\n")
-{r}
-# Extract coordinates
-coords <- as.data.frame(mds_result$points)
-colnames(coords) <- c("Dim1", "Dim2")
-coords$Brand <- brands
-{r}
-# Plot perceptual map
-ggplot(coords, aes(x=Dim1, y=Dim2, label=Brand)) +
-  geom_point(size=4, color="steelblue") +
-  geom_text_repel(size=4, fontface="bold") +
-  geom_hline(yintercept=0, linetype="dashed", alpha=0.5) +
-  geom_vline(xintercept=0, linetype="dashed", alpha=0.5) +
-  labs(
-    title="Perceptual Map of Automobile Brands",
-    subtitle=paste("Metric MDS | GoF =", round(gof,3)),
-    x="Dimension 1 (Economy ← → Luxury)",
-    y="Dimension 2 (Practical ← → Sporty)"
-  ) +
-  theme_minimal(base_size=13)
-{r}
 # ============================================================
-# Exercise 2: Non-Metric MDS using smacof package
+# M.Sc. Business Analytics – Business Econometrics (MSBA 5201)
+# End Semester Examination – Complete Solution
 # ============================================================
-install.packages("smacof")
-library(smacof)
-# Convert to dissimilarity object
-dissim <- matrix(c(
-  0, 2, 4, 7, 8, 5, 3, 7,
-  2, 0, 4, 7, 8, 5, 3, 7,
-  4, 4, 0, 6, 7, 4, 4, 6,
-  7, 7, 6, 0, 2, 8, 7, 2,
-  8, 8, 7, 2, 0, 9, 8, 3,
-  5, 5, 4, 8, 9, 0, 2, 8,
-  3, 3, 4, 7, 8, 2, 0, 7,
-  7, 7, 6, 2, 3, 8, 7, 0
-), nrow=8, dimnames=list(brands,brands))
 
-dissim
-{r}
-diss_obj <- max(dissim) - dissim
-diag(diss_obj) <- 0
-# Run non-metric MDS
-nmds_result <- mds(diss_obj, ndim=2, type="ordinal")
-{r}
-# Stress value
-cat("Stress-1:", round(nmds_result$stress, 4), "\n")
+import pandas as pd
+import numpy as np
+import statsmodels.api as sm
+from statsmodels.stats.diagnostic import het_breuschpagan
+from statsmodels.stats.stattools import durbin_watson
+from sklearn.metrics import confusion_matrix, accuracy_score
 
-# Shepard diagram
-plot(nmds_result, plot.type="Shepard",
-     main="Shepard Diagram - Non-metric MDS")
-{r}
-# Stress by dimensions (scree plot)
-stress_vals <- numeric(5)
-for(d in 1:5){
-  fit <- mds(diss_obj, ndim=d, type="ordinal")
-  stress_vals[d] <- fit$stress
-}
-plot(1:5, stress_vals, type="b", pch=19, col="tomato",
-     xlab="Number of Dimensions", ylab="Stress",
-     main="Scree Plot: Stress vs. Dimensions")
-abline(h=0.05, lty=2, col="gray50")
-{r}
-# Configuration plot
-plot(nmds_result, main="Non-Metric MDS: Automobile Brands")
-{r}
+# Load data
+beauty = pd.read_excel("beauty (1).xls")
+
+# (a) Fractions of men and women with above-average looks
+women = beauty[beauty["female"] == 1]
+men = beauty[beauty["female"] == 0]
+
+frac_women_abv = women["abvavg"].mean()
+frac_men_abv = men["abvavg"].mean()
+frac_abv = beauty["abvavg"].mean()
+frac_bel = beauty["belavg"].mean()
+
+print("Q1(a) Results:")
+print("Fraction of women with above-average looks:", frac_women_abv)
+print("Fraction of men with above-average looks:", frac_men_abv)
+print("Overall fraction above-average:", frac_abv)
+print("Overall fraction below-average:", frac_bel)
+
+beauty[['female', 'abvavg']].groupby('female').value_counts(normalize=True).mul(100).round(2).astype(str) + '%'
+beauty['abvavg'].value_counts(normalize=True).mul(100).round(3).astype(str) + '%'
+
+#plt.scatter(beauty['exper'], beauty['lwage'], alpha=0.3)
+sns.scatterplot(x='exper',y='wage', hue='female',data=beauty)
+plt.xlabel("Experience")
+plt.ylabel("Hourly Wage")
+plt.title("Scatterplot of Hourly Wage Vs. Experience")
+plt.grid(True)
+plt.show()
+
+# Interpretation (a)
+# More individuals are classified as below-average if belavg > abvavg.
+
+The modified model is:
+Your regression specification is:
+
+$$
+\begin{aligned}
+lwage_i &= \beta_0 
++ \beta_1 belavg_i 
++ \beta_2 abvavg_i 
++ \beta_3 female_i 
++ \beta_4 educ_i \\
+&\quad + \beta_5 exper_i 
++ \beta_6 expersq_i 
++ \beta_7 (female_i \times belavg_i) \\
+&\quad + \beta_8 (female_i \times abvavg_i)
++ \beta_9 (female_i \times educ_i) \\
+&\quad + \beta_{10} (female_i \times exper_i)
++ \beta_{11} (female_i \times expersq_i)
++ u_i
+\end{aligned}
+$$
+
+# (b) Separate regressions by gender
+def run_simple_reg(df):
+    X = df[["belavg", "abvavg"]]
+    X = sm.add_constant(X)
+    y = df["lwage"]
+    model = sm.OLS(y, X).fit()
+    return model
+
+model_men = run_simple_reg(men)
+model_women = run_simple_reg(women)
+
+print("\nQ1(b) Regression – MEN")
+print(model_men.params)
+print("R-squared:", model_men.rsquared)
+print("p-value (belavg):", model_men.pvalues["belavg"])
+
+print("\nQ1(b) Regression – WOMEN")
+print(model_women.params)
+print("R-squared:", model_women.rsquared)
+print("p-value (belavg):", model_women.pvalues["belavg"])
+
+# (c) Test for women: abvavg > 0
+print("\nQ1(c) Women – abvavg coefficient and p-value")
+print("Coefficient:", model_women.params["abvavg"])
+print("p-value:", model_women.pvalues["abvavg"])
+
+# (d) Extended model
+controls = ["educ","exper","expersq","union","goodhlth","black",
+            "married","south","bigcity","smllcity","service"]
+
+def run_full(df):
+    X = df[["belavg","abvavg"] + controls]
+    X = sm.add_constant(X)
+    y = df["lwage"]
+    return sm.OLS(y, X).fit()
+
+full_men = run_full(men)
+full_women = run_full(women)
+
+print("\nQ1(d) Extended Model – MEN (looks coefficients)")
+print(full_men.params[["belavg","abvavg"]])
+
+print("\nQ1(d) Extended Model – WOMEN (looks coefficients)")
+print(full_women.params[["belavg","abvavg"]])
+
+
+# Note: Dataset name inferred as CIGARETT.xlsx
+cig = pd.read_excel("CIGARETT.xlsx")
+
+# (a) LNC on LNP
+X1 = sm.add_constant(cig["LNP"])
+y1 = cig["LNC"]
+model1 = sm.OLS(y1, X1).fit()
+
+print("Q2(a) Results:")
+print(model1.params)
+print("R-squared:", model1.rsquared)
+
+# (b) Add income
+X2 = sm.add_constant(cig[["LNP","LNY"]])
+model2 = sm.OLS(y1, X2).fit()
+
+print("\nQ2(b) Results with Income:")
+print(model2.params)
+print("R-squared:", model2.rsquared)
+
+# (c) Price elasticity
+print("\nQ2(c) Price Elasticity:")
+print("Elasticity:", model2.params["LNP"])
+print("p-value:", model2.pvalues["LNP"])
+
+# (d) Income elasticity
+print("\nQ2(d) Income Elasticity:")
+print("Elasticity:", model2.params["LNY"])
+print("p-value:", model2.pvalues["LNY"])
+
+
+# Load data
+benign = pd.read_excel("benign (1).xls")
+
+# Prepare variables
+X = benign[["Age","HIGD","CHK","AGPI","Miscarriages","Weight"]]
+X = sm.add_constant(X)
+y = benign["Cancer"]
+
+# Logistic regression
+logit = sm.Logit(y, X).fit(disp=False)
+
+print("Q3(a) Logistic Regression Coefficients:")
+print(logit.params)
+
+# Odds ratios
+odds_ratios = np.exp(logit.params)
+print("\nQ3(c) Odds Ratios:")
+print(odds_ratios)
+
+# Pseudo R-squared
+print("\nPseudo R-squared:", logit.prsquared)
+
+# Confusion matrix
+pred_prob = logit.predict(X)
+pred_class = (pred_prob >= 0.5).astype(int)
+
+cm = confusion_matrix(y, pred_class)
+acc = accuracy_score(y, pred_class)
+
+print("\nConfusion Matrix:")
+print(cm)
+print("Accuracy Score:", acc)
+
+# (d) Predicted probability for given woman
+new_obs = pd.DataFrame({
+    "const":1,
+    "Age":[45],
+    "HIGD":[6],
+    "CHK":[0],
+    "AGPI":[15],
+    "Miscarriages":[3],
+    "Weight":[135]
+})
+
+pred_new = logit.predict(new_obs)
+print("\nQ3(d) Predicted Probability for Given Woman:")
+print(pred_new)
+
 # ============================================================
-# Exercise 3: Correspondence Analysis - Brand × Attribute
+# INTERPRETATIONS (Exam-Style, Embedded as Comments)
 # ============================================================
-install.packages("FactoMineR")
-install.packages("factoextra")
-library(FactoMineR)
-library(factoextra)
-# Brand-Attribute contingency table
-brand_attr <- matrix(c(
-  95, 30, 15,  5, 10, 20,   # Brand A
-  20, 80, 40, 10, 25, 30,   # Brand B
-  10, 15, 90,  5, 60, 35,   # Brand C
-  5, 10, 20, 95, 15, 25,   # Brand D
-  15, 20, 30, 10, 80, 70    # Brand E
-), nrow=5, byrow=TRUE)
-{r}
-rownames(brand_attr) <- c("BrandA","BrandB","BrandC","BrandD","BrandE")
-colnames(brand_attr) <- c("Affordable","Reliable","Stylish","EcoFriendly","Premium","Innovative")
-{r}
-# Chi-square test of independence
-chisq_test <- chisq.test(brand_attr)
-cat("Chi-square:", round(chisq_test$statistic, 2),
-    "| df:", chisq_test$parameter,
-    "| p-value:", format(chisq_test$p.value, digits=3), "\n")
-{r}
-# Run Correspondence Analysis
-ca_result <- CA(brand_attr, graph=FALSE)
 
-# Summary of results
-summary(ca_result)
+"""
+Q1 Interpretation:
+(a) Men and women differ slightly in above-average looks. Overall, more individuals
+are rated below average than above average.
+(b) The belavg coefficient is negative, indicating a wage penalty for below-average looks.
+The hypothesis H0: β1 = 0 vs H1: β1 < 0 tests whether unattractive individuals earn less.
+Low p-values imply rejection of H0.
+(c) For women, abvavg is positive and statistically significant, implying attractive women
+earn more than average-looking women.
+(d) After adding controls, the looks coefficients remain similar, indicating robustness.
 
-# Eigenvalues and inertia
-cat("\n--- Inertia explained ---\n")
-print(ca_result$eig)
-{r}
-# Run Correspondence Analysis
-ca_result <- CA(brand_attr, graph=FALSE)
+Q2 Interpretation:
+(a) Price has a negative and significant effect on cigarette consumption.
+(b) Adding income improves model fit, supported by higher R².
+(c) Price elasticity is negative and statistically significant, and statistically different from 1.
+(d) Income elasticity is small and often insignificant, likely due to addictive behavior.
 
-# Summary of results
-summary(ca_result)
+Q3 Interpretation:
+The logistic regression shows which factors significantly affect cancer probability.
+Odds ratios greater than 1 increase risk; less than 1 reduce risk.
+Pseudo R² indicates reasonable fit. The confusion matrix shows good predictive accuracy.
+The predicted probability quantifies individual cancer risk given characteristics.
+"""
+---------------------------------------------------------------------------------------------------------------
+Visualizations:
 
-# Eigenvalues and inertia
-cat("\n--- Inertia explained ---\n")
-print(ca_result$eig)
-{r}
-# Symmetric biplot
+After data splitting, box plot to show categorical dependent variable against multiple predictors
 
-fviz_ca_biplot(
-  ca_result,
-  repel = TRUE,
-  title = "CA Biplot: Brand × Attribute Associations"
-)
+import matplotlib.pyplot as plt
 
-# Column (attribute) contributions to each dimension
-fviz_contrib(ca_result, choice="col", axes=1,
-             title="Column Contributions to Dimension 1")
-fviz_contrib(ca_result, choice="col", axes=2,
-             title="Column Contributions to Dimension 2")
+# Convert target
+train['default_label'] = train['default'].map({0: 'Non-Defaulter', 1: 'Defaulter'})
 
-# PCA FA CA
-## Principal Component Analysis and Factor Analysis in R
+num_vars = ["age", "employ", "income", "debtinc", "creddebt", "othdebt"]
+colors = ['#4CAF50', '#F44336']  # Green, Red
 
+fig, axes = plt.subplots(2, 3, figsize=(15, 8))
+axes = axes.flatten()
 
-mydata<- read.csv("C:/Econometrics/Data/pca_gsp.csv")
-attach(mydata)
+for ax, var in zip(axes, num_vars):
+    bp = train.boxplot(column=var, by='default_label', ax=ax, patch_artist=True)
+    
+    # Apply colors
+    for patch, color in zip(ax.artists, colors):
+        patch.set_facecolor(color)
+    
+    ax.set_title(var)
+    ax.set_xlabel("")
+    ax.set_ylabel("")
 
-# Define variables
-X <- cbind(Ag, Mining, Constr, Manuf, Manuf_nd, Transp, Comm, Energy, TradeW, TradeR, RE, Services, Govt)
+plt.suptitle("")
+plt.tight_layout()
+plt.show()
+#......
+import matplotlib.pyplot as plt
+import seaborn as sns
 
-# Descriptive statistics
-summary(X)
-cor(X)
+sns.set_style("whitegrid")
 
-# Principal component analysis
-pca1 <- princomp(X, scores=TRUE, cor=TRUE)
-summary(pca1)
+# -------------------------------
+# Variables (edit as needed)
+# -------------------------------
+target_cat = 'default'      # categorical target
+target_cont = 'target'      # continuous target
+time_var = 'date'           # time variable
 
-# Loadings of principal components
-loadings(pca1)
-#pca1$loadings
+num_vars = ["age", "employ", "income", "debtinc", "creddebt", "othdebt"]
 
-# Scree plot of eigenvalues
-plot(pca1)
-screeplot(pca1, type="line", main="Scree Plot")
+# -------------------------------
+# 1. BOX PLOTS (Categorical Target vs Predictors)
+# -------------------------------
+fig, axes = plt.subplots(2, 3, figsize=(15, 8))
 
-# Biplot of score variables
-biplot(pca1)
+for ax, var in zip(axes.flatten(), num_vars):
+    sns.boxplot(x=target_cat, y=var, data=train, ax=ax)
+    ax.set_title(f"{var} vs {target_cat}")
 
-# Scores of the components
-pca1$scores[1:10,]
-
-# Rotation
-varimax(pca1$loadings[,1:3])
-promax(pca1$loadings[,1:3])
+plt.tight_layout()
+plt.show()
 
 
-## Factor analysis 
-fa1 <- factanal(X, factor=3, rotation="none")
-fa1
+# -------------------------------
+# 2. SCATTER PLOTS (Continuous Target vs Predictors)
+# -------------------------------
+fig, axes = plt.subplots(2, 3, figsize=(15, 8))
 
-fa2 <- factanal(X, factor=3, rotation="varimax")
-fa2
+for ax, var in zip(axes.flatten(), num_vars):
+    sns.scatterplot(x=var, y=target_cont, data=train, ax=ax)
+    ax.set_title(f"{target_cont} vs {var}")
 
-fa3 <- factanal(X, factors=3, rotation="varimax", scores="regression")
-fa3
-fa3$scores
-
-fa4 <- factanal(X, factor=3, rotation="promax")
-fa4
-
-# KMO Statistics and Bartlett's Test of Sphericity
-#install.packages("REdaS")
-library(REdaS)
-KMOS(X)
-bart_spher(X)
+plt.tight_layout()
+plt.show()
 
 
-##Cluster Analysis
-mydata <- read.csv("~/2025-26/Jan_MSBA_/utilities.csv")
-attach(mydata)
+# -------------------------------
+# 3. LINE PLOTS (Time Series)
+# -------------------------------
+if time_var in train.columns:
+    fig, axes = plt.subplots(2, 3, figsize=(15, 8))
 
-# Scatter plot 
-plot(Fuel_Cost~Sales, data = mydata)
-with(mydata,text(Fuel_Cost ~ Sales, labels=Company,pos=4))
+    for ax, var in zip(axes.flatten(), num_vars):
+        sns.lineplot(x=time_var, y=var, data=train, ax=ax)
+        ax.set_title(f"{var} over time")
 
-# Normalization
-z <- mydata[,-c(1,1)]
-z
-means <- apply(z,2,mean)
-sds <- apply(z,2,sd)
-nor <- scale(z,center=means,scale=sds)
-
-# Calculate Euclidean distance matrix  
-distance = dist(nor)
-print(distance, digits=3)
-
-# Hierarchical agglomerative clustering using complete linkage
-mydata.hclust = hclust(distance)
-plot(mydata.hclust)
-plot(mydata.hclust,labels=mydata$Company,main='Default from hclust')
-plot(mydata.hclust,hang=-1)
-
-# Hierarchical agglomerative clustering using "average" linkage 
-mydata.hclusta<-hclust(distance,method="average")
-plot(mydata.hclusta,hang=-1)
-
-# Cluster membership
-member.c = cutree(mydata.hclust,3)
-member.a = cutree(mydata.hclusta,3)
-table(member.c, member.a)
-
-# Characterizing clusters means
-aggregate(nor,list(member.c),mean)
-aggregate(mydata[,-c(1,1)],list(member.c),mean)
-
-# Silhouette Plot
-library(cluster) 
-plot(silhouette(cutree(mydata.hclust,3), distance)) 
-
-# Scree Plot
-wss <- (nrow(nor)-1)*sum(apply(nor,2,var))
-for (i in 2:20) wss[i] <- sum(kmeans(nor, centers=i)$withinss)
-plot(1:20, wss, type="b", xlab="Number of Clusters", ylab="Within groups sum of squares") 
-
-# K-means clustering
-set.seed(123)
-kc<-kmeans(nor,4)
-kc
-plot(Sales~D.Demand,mydata,col=kc$cluster)
+    plt.tight_layout()
+    plt.show()
 
 
-## Interpretations
+# -------------------------------
+# 4. PAIRPLOT (Predictor Relationships)
+# -------------------------------
+sns.pairplot(train[num_vars])
+plt.show()
 
-# 4.2 Interpreting the KMO Value
-The overall KMO value of 0.87 tells us that 87% of the variance in the dataset can be attributed to common factors (shared structure). Individual MSA values below 0.5 for any variable would flag it as unsuitable for inclusion in PCA. In this dataset, all variables are above the acceptable threshold.
 
-4.3 Interpreting Bartlett's Test
-Since the p-value is far below 0.05, we reject the null hypothesis that the correlation matrix is an identity matrix. This confirms that the variables are meaningfully correlated with each other, which is a prerequisite for PCA to work correctly. Without shared correlations, PCA has no structure to extract.
+# -------------------------------
+# 5. HISTOGRAM (Target Distribution)
+# -------------------------------
+plt.figure(figsize=(6,4))
+sns.histplot(train[target_cont], kde=True)
+plt.title("Target Distribution")
+plt.show()
 
-4.4 Interpreting princomp() Standard Deviations
-The standard deviations represent the square root of eigenvalues. The eigenvalue for each component tells us how much variance it captures. The rule of thumb (Kaiser's criterion) is to retain components with eigenvalues > 1 (i.e., standard deviation > 1). This means the component captures more variance than any single original variable.
-4.5 Interpreting Loadings
-Loadings are the correlations between original variables and principal components. Guidelines for interpretation:
-Loading Magnitude	Strength of Association
-|loading| >= 0.7	Very strong — variable is a major contributor to the component
-|loading| 0.5 – 0.69	Strong association
-|loading| 0.3 – 0.49	Moderate — variable partially defines the component
-|loading| < 0.3	Weak — variable does not meaningfully contribute (often suppressed by R)
+#............................
+Correlation Matrix:
+## Let's create correlation matrix 
+cols = ['Y','X1','X2','X3','X4','X5','X6']
+corr_matrix = emp[cols].corr(method= 'pearson')
+corr_matrix
 
-4.6 Interpreting the Scree Plot
-The x-axis shows component numbers (1 to 50), and the y-axis shows eigenvalues. The key decision rule: look for the 'elbow' — the point after which eigenvalues drop sharply and level off. Components before the elbow are retained. Components after the elbow contribute trivially. Kaiser's Rule (eigenvalue > 1) overlaps with this: both suggest retaining the first 9 components in this analysis.
+correlation plot
+# Let's view the matrix 
+plt.figure(figsize=(8,6))
+sns.heatmap(corr_matrix,
+            annot=True,
+            fmt=".2f",
+            cmap='coolwarm',
+            center=0)
+plt.title("Correlation Matrix of Variables")
+plt.show()
 
-4.7 Interpreting the Biplot
-In the biplot of PC1 vs PC2:
-•	Arrows pointing in the same direction → those variables are positively correlated with each other.
-•	Arrows pointing in opposite directions → those variables are negatively correlated.
-•	Arrow length → longer arrows indicate the variable is more influential.
-•	Points clustered together → those respondents have similar score profiles.
-•	Points near an arrow tip → those respondents score high on that variable.
+#-----------------------------------------------------------------------------------------------------------------------#
+Linear Regression 
+PRF:
+$$
+\begin{aligned}
+Y = \beta_0 +\beta_1 X1 +\beta_2 X2+\beta_3 X3+\\
++\beta_4 X4+\beta_5X5 + u
+\end{aligned}
+$$
+ Interpretation:
+	R2 value , F-statistic, p-value (<0.05) 
+	Individual variable coefficient (t-value and p-value)
+	1 unit increase in X1 increases or decreases the beta_1 unit in Y. 
 
-4.8 Interpreting Rotation (Varimax / Promax)
-After rotation, the loading matrix is reinterpreted. The goal of rotation is to achieve simple structure:
-•	Each variable should load highly on one component and near zero on others.
-•	Each component should be defined by a distinct cluster of variables.
-This makes it easier to label and interpret each component as a coherent construct. In personality research, we expect 5 components (matching the Big Five dimensions) to emerge after rotation.
+Log-linear 
 
-## FACTOR ANALYSIS
-4.4 Interpreting the Chi-Square Test (Model Fit)
-factanal() reports a chi-square test after fitting. This tests whether the chosen number of factors (here: 3) provides a statistically adequate fit to the correlation matrix.
-•	p > 0.05 → Fail to reject H0 → 3 factors are sufficient to explain the correlations.
-•	p < 0.05 → Reject H0 → 3 factors are not sufficient — try extracting more factors.
-📌 Note: With n = 50 states (small sample), this test has limited power and results should be interpreted cautiously alongside substantive criteria.
+PRF: 
 
-4.5 Interpreting Factor Scores
-Factor scores are the coordinates of each observation (state) in the factor space. They have mean ≈ 0 and SD ≈ 1. Use them to:
-•	Profile each state: Which factor(s) are dominant for each state?
-•	Compare states: States with similar profiles are nearby in factor space.
-•	Input for further analysis: Use scores as predictors in regression or as input for cluster analysis.
-4.6 Interpreting Factor Correlation Matrix (Promax only)
-The factor correlation matrix shows how much the extracted factors overlap. For a Promax solution:
-•	Values close to 0 → Factors are nearly orthogonal (similar to Varimax).
-•	Values of 0.3–0.6 → Moderate correlation — factors share some variance but remain distinguishable.
-•	Values > 0.7 → Factors overlap heavily — may indicate too many factors were extracted.
+$$
+\begin{aligned}
+Log(Y) = \beta_0 +\beta_1 X1 +\beta_2 X2+\beta_3 X3+\\
++\beta_4 X4+\beta_5X5 + u
+\end{aligned}
+$$
+Interpretation:
+	R2 value , F-statistic, p-value (<0.05) 
+	Individual variable coefficient (t-value and p-value)
+	A 1 unit increase in X1 leads to a 100×β_1% change in Y 
 
-## CLUSTER Analysis
-4.1 Interpreting the Dendrogram
-Feature	What It Means
-Height of merge	How dissimilar the two clusters were when they merged — taller = more different
-Companies at same branch	Similar utility profiles — early merges are most alike
-Long vertical line before merge	Large gap in similarity — natural cluster boundary
-Where to cut	Find the largest vertical gap — cut there to define k clusters
+Log-log Model
+PRF:
+$$
+\begin{aligned}
+Log(Y) = \beta_0 +\beta_1 log(X1) +\beta_2 log(X2)+\beta_3 X3+\\
++\beta_4 X4+\beta_5X5 + u
+\end{aligned}
+$$
+Interpretation: 
+	R2 value , F-statistic, p-value (<0.05) 
+	Individual variable coefficient (t-value and p-value)
+	A 1% increase in Xleads to a β_1% change in Y.
+#--------------------------------------------------------------------------------------------------------------------------------#
+Dummy Variables: 
+# Convert to category
+bike['season'] = bike['season'].astype('category')
+bike['weathersit'] = bike['weathersit'].astype('category')
 
-4.2 Interpreting the Cross-Tabulation
-The table(member.c, member.a) output should ideally show a near-diagonal structure — most companies assigned to the same cluster regardless of linkage method. Perfect diagonal agreement means both methods produce identical cluster assignments. Off-diagonal entries indicate companies at cluster boundaries that are assigned differently depending on the linkage used.
-4.3 Interpreting Cluster Means
-Cluster means on the original scale allow business interpretation:
-•	Compare each cluster's average across all 8 variables.
-•	Identify which variables differ most between clusters — these are the defining characteristics.
-•	Label each cluster using a business description: e.g., 'High-volume, low-cost producers' or 'Small, expensive urban utilities.'
-4.4 Interpreting Silhouette Width
-Average Silhouette Width	Quality Assessment
-s > 0.70	Strong cluster structure — well-separated, coherent clusters
-0.50 < s < 0.70	Reasonable structure
-0.25 < s < 0.50	Weak structure — clusters overlap somewhat
-s < 0.25	No substantial cluster structure found
+# Create dummies
+dummies = pd.get_dummies(
+    bike[['season', 'weathersit']],
+    drop_first=True
+).astype(int)
+bike = pd.concat([bike, dummies], axis= 1)
+print(bike.head())
 
-4.5 Interpreting the WSS Scree Plot
-The elbow point in the WSS plot marks the optimal cluster count. Before the elbow: adding clusters gives large variance reduction. After the elbow: adding clusters provides diminishing returns. The plot's x-axis is the number of clusters; the y-axis is the total within-group sum of squares. The elbow is typically at k=3 or k=4 for this utilities dataset.
-4.6 Interpreting K-Means Output
-K-Means Output Element	Interpretation
-Cluster sizes	Number of companies per cluster — very unequal sizes may indicate outliers
-Cluster means	The centroid of each cluster in variable space — the 'average company' of that cluster
-Within-cluster SS	Internal compactness — smaller means tighter, more homogeneous clusters
-Between SS / Total SS	Variance explained ratio — above 60% is considered a good clustering result
 
+SRF: 
+$$
+\begin{aligned}
+log(cnt) = beta_0 + \beta_1 temp + \beta_2 hum +\beta_3 windspeed+\beta_4 season_2 +\beta_5 season_3+\beta_6 season_4 \\
++\beta_7 weathersit_1 +\beta_8 weathersit_2 +\beta_9 weathersit_3+\beta_10 workingday + u 
+\end{aligned} 
+$$
+
+
+#----------------------------------------------------------------------------------------------------------------------------#
+Interaction Term
+Female as interaction term
+$$
+\begin{aligned}
+lwage_i &= \beta_0 
++ \beta_1 belavg_i 
++ \beta_2 abvavg_i 
++ \beta_3 female_i 
++ \beta_4 educ_i \\
+&\quad + \beta_5 exper_i 
++ \beta_6 expersq_i 
++ \beta_7 (female_i \times belavg_i) \\
+&\quad + \beta_8 (female_i \times abvavg_i)
++ \beta_9 (female_i \times educ_i) \\
+&\quad + \beta_{10} (female_i \times exper_i)
++ \beta_{11} (female_i \times expersq_i)
++ u_i
+\end{aligned}
+$$
+	Joint Hypothesis test: 
+hypothesis = """
+female:belavg = 0,
+female:abvavg = 0,
+female:educ = 0,
+female:exper = 0,
+female:expersq = 0
+"""
+print("F-Test for Joint Significance of Interaction Terms:\n")
+model2.f_test(hypothesis)
+#----------------------------------------------------------------------------------------------------------------------------#
+## For single predictor hypothesis check, we perform t-test
+ 
+model8.t_test("LNP= 0")
+
+#............................................................................................................................................#
+Diagnostics:
+(1)Residual diagnostics
+	Residual vs Fitted values : If curve line or non random pattern appears, non linearity is there.
+	Q-Q plot: If at the tails some outliers are there and on the line data points are not aligned then non-normal distribution is there. 
+	Scale-Location plot: If residuals are  not randomly scattered, meaning some pattern is there like spread more towards the end or beginning or any funnel shape is there, it indicates heteroscedasticity.
+	Residual vs Leverage plot: It shows influential points capturing overpowering residuals.
+Code:
+Import lmdiag 
+lmdiag.plot(model)
+#--------------------------------------------------------------------------------------------------------------------------------#
+(2) Multicollinearity:
+	Correlation plot and model high condition number shows the presence of potential multicollinearity.
+VIF calculation:
+# VIF 
+X = model1.model.exog 
+# Get feature names - corrected to use the model's exog_names attribute
+feature_names = model1.model.exog_names  
+
+# Compute VIF 
+vif_data = pd.DataFrame({
+    "Variable": feature_names, 
+    "VIF": [variance_inflation_factor(X, i) for i in range(X.shape[1])] 
+})
+
+print(vif_data)
+
+Interpretation:
+If VIF >10 : High Multicollinearity
+Vif (5-10): Moderate Multicollinearity
+Vif(1-5): Very negligible multicollinearity 
+Vif=1 : No Multicollinearity
+
+#.....................................................................................................................................#
+(3) Hetroscedasticity:
+$$
+\begin{aligned}
+H_0&: Homoscedasticity
+H_1&: Heteroscedasticity
+\end{aligned}
+$$
+
+import statsmodels.stats.api as sms
+residuals = model1.resid 
+exog = model1.model.exog 
+bp_test = sms.het_breuschpagan(residuals, exog)
+
+labels = ['LM Statistic', 'LM p-value', 'F-Statistic', 'F p-value']
+print(dict(zip(labels, bp_test)))
+
+Interpretation:
+	If p< 0.05, reject null hypothesis 
+
+#--------------------------------------------------------------------------------------------------------------------------------#
+(4) Autocorrelation
+## Calculating residuals
+blaisdell['uhat_1']= model1.resid 
+blaisdell['uhat_2']= model1.resid.shift(1)
+#### ACF plot
+uhat1 = blaisdell['uhat_1'].values 
+import statsmodels.api as sm
+## Let's compute Lag.Max Equivalent 
+lag_max = int(np.floor(len(uhat1)/4)) 
+
+plt.clf() 
+sm.graphics.tsa.plot_acf(uhat1, lags = lag_max) 
+plt.title("ACF Plot of residuals")
+plt.tight_layout() 
+plt.show()
+### PACF plot 
+uhat1 = blaisdell['uhat_1'].values 
+#import statsmodels.api as sm
+## Let's compute Lag.Max Equivalent 
+lag_max = int(np.floor(len(uhat1)/4)) 
+
+plt.clf() 
+sm.graphics.tsa.plot_pacf(uhat1, lags = lag_max) 
+plt.title("PACF Plot of residuals")
+plt.tight_layout() 
+plt.show()
+
+### Durbin-Watson Test (1st order Autocorrelation) 
+from statsmodels.stats.stattools import durbin_watson
+dw = durbin_watson(model1.resid)
+print("Durbin-Watson Statistic:", dw)
+
+interpretation:
+	DW ≈ 2 → Good model (no autocorrelation) 
+	DW < 2 → Residuals are positively correlated 
+	DW > 2 → Residuals are negatively correlated 
+### Breusch-Godfrey Test 
+from statsmodels.stats.diagnostic import acorr_breusch_godfrey
+
+bg_test = acorr_breusch_godfrey(model1, nlags=4)
+
+print("LM Statistic:", bg_test[0])
+print("LM p-value:", bg_test[1])
+print("F Statistic:", bg_test[2])
+print("F p-value:", bg_test[3])
+
+Interpretation: 
+If p-value > 0.05 → Fail to reject H₀
+ No autocorrelation ✅ 
+ If p-value < 0.05 → Reject H₀
+Autocorrelation present ⚠️
+#.................................................................................................................................................#
+(5)Model Misspecification Test: 
+#RESET test 
+reset_test = linear_reset(model_improved, power=2, use_f=True) 
+print("\nRESET Test F-stat:", reset_test.fvalue)
+print("RESET Test p-value:", reset_test.pvalue)
+
+#--------------------------------------------------------------------------------------------------------------------------------#
+Logistic Regression
+## PRF:
+$$
+\log\left(\frac{P(\text{Cancer}=1 \mid X)}{1 - P(\text{Cancer}=1 \mid X)}\right)
+= \beta_0 + \beta_1 \text{Age} + \beta_2 \text{HIGD} + \beta_3 \text{CHK} + \beta_4 \text{AGPI} + \beta_5 \text{Miscarriages} + \beta_6 \text{Weight}
+$$
+Code:
+import statsmodels.api as sm
+log_model = smf.glm('Cancer~Age+HIGD+CHK+AGPI+Miscarriages+Weight', family = sm.families.Binomial(), data = benign).fit() 
+print(log_model.summary())
+
+## Interpretation:
+*pseudo rsquared :
+0.02 – 0.10	Weak fit
+0.10 – 0.20	Moderate fit
+0.20 – 0.40	Good fit 
+> 0.40	Very strong fit (rare)
+
+## Log of odds, Odds ratio and Percentage
+coefficients = logit_fit1.params 
+
+#calculate the odds ratios 
+odds_ratios = np.exp(coefficients) 
+#calculate the percentage change in odds 
+percent_change = (odds_ratios - 1)* 100 
+
+#create a pandas dataframe to combine the results 
+
+results = pd.DataFrame({
+    'Estimate': coefficients.round(4), 
+    'OR': odds_ratios.round(4), 
+    '% Change in Odds': percent_change.round(2) }) 
+results
+######Why R2 is meaning less in case of logistic regression ?
+#Why R2 value is very low, present graphically
+# plot debtinc vs default
+plt.figure(figsize=(8,6))
+plt.plot(train['debtinc'], train['default'],'*', color = "red") 
+plt.title('Debt to income vs. Default') 
+plt.xlabel("Debtinc")
+plt.ylabel("Default")
+# Fit a regression model 
+model = smf.ols(formula='default~debtinc',data=train).fit() 
+
+# Plot the regression line
+plt.plot(train['debtinc'],model.fittedvalues, color ="blue") 
+plt.grid(True)
+plt.show()
+#-----------------------------------------------------------------------------------------------------------------------------#
+Pseudo R2:
+# Mc Fadden R2
+mc_fadden = log_model.pseudo_rsquared(kind="mcf").round(2)
+# Cox-Snell R2
+cs = log_model.pseudo_rsquared(kind="cs").round(2)
+print("Mc Fadden R square:", mc_fadden) 
+print("Cox-Snell R square:", cs)
+#-----------------------------------------------------------------------------------------------------------------------------#
+Confusion Matrix
+from sklearn.metrics import confusion_matrix
+
+y_true = benign['Cancer']
+y_pred = (log_model.predict(benign)>0.5).astype(int) 
+
+cm= confusion_matrix(y_true,y_pred)
+
+tn,fp,fn,tp = cm.ravel()
+
+## metrics
+Accuracy = (tp+tn)/cm.sum()
+sensitivity = tp / (tp + fn)   # recall
+specificity = tn / (tn + fp)
+
+print("Confusion Matrix:\n", cm)
+print("Accuracy:", accuracy)
+print("Sensitivity:", sensitivity)
+print("Specificity:", specificity)
+
+Interpretation:
+Accuracy: Proportion of total correct predictions
+Sensitivity/Recall: Ability to correctly identify actual positives
+Specificity: Ability to correctly identify actual negatives
+Precision: Out of predicted positives, how many are actually positive
+
+### ROC Curve
+# Predict probabilities for the positive class (response)
+prob = logit_fit1.predict()
+# Get the actual outcome values
+actual = logit_fit1.model.endog
+# Call the libraries
+from sklearn.metrics import roc_curve, auc
+# Calculate ROC curve
+fpr, tpr, thresholds = roc_curve(actual, prob)
+# Calculate AUC
+roc_auc = auc(fpr, tpr)
+# Plot ROC curve
+plt.figure(figsize=(8, 6))
+plt.plot(fpr, tpr, color='blue', lw=2, label=f'ROC curve (AUC = {roc_auc:.2f})')
+plt.plot([0, 1], [0, 1], color='gray', linestyle='--')  # Diagonal line for random guessing
+plt.xlim([0.0, 1.0])
+plt.ylim([0.0, 1.05])
+plt.xlabel('False Positive Rate (FPR)')
+plt.ylabel('True Positive Rate (TPR)')
+plt.title('ROC Curve for logit_fit1')
+plt.legend(loc='lower right')
+plt.show()
+
+#.. To combinely show coefficients
+import statsmodels.formula.api as smf 
+from statsmodels.iolib.summary2 import summary_col
+model1 = smf.ols('lwage~belavg+abvavg', data = beauty[beauty['female']==0]).fit() 
+model2 = smf.ols('lwage~belavg+abvavg', data = beauty[beauty['female']==1]).fit()
+
+table = summary_col([model1,model2],model_names=['men', 'women'], stars = True)
+print(table)
 
 
